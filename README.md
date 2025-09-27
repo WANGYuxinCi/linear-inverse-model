@@ -52,11 +52,11 @@ If you encounter problems in running the linear inverse model or have questions,
 
 Alexander, M. A., L. Matrosova, C. Penland, J. D. Scott, and P. Chang, 2008: Forecasting Pacific SSTs: Linear Inverse Model Predictions of the PDO. J. Climate, 21, 385–402, https://doi.org/10.1175/2007JCLI1849.1.
 
-
-
 Capotondi, A., M. Newman, T. Xu, and E. Di Lorenzo, 2022: An optimal precursor of northeast Pacific marine heatwaves and central Pacific El Niño events. Geophys. Res. Lett., 49, e2021GL097350, https://doi.org/10.1029/2021GL097350.
 
 Devanand, A., and Coauthors, 2024: Australia’s Tinderbox Drought: An extreme natural event likely worsened by human-caused climate change. Sci. Adv., 10, eadj3460, https://doi.org/10.1126/sciadv.adj3460.
+
+Hasselmann, K., 1988: PIPs and POPs: The reduction of complex dynamical systems using principal interaction and oscillation patterns. J. Geophys. Res., 93, 11 015–11 021, https://doi.org/10.1029/JD093iD09p11015.
 
 Lou, J., T. J. O’Kane, and N. J. Holbrook, 2020: A Linear Inverse Model of Tropical and South Pacific Seasonal Predictability. J. Climate, 33, 4537–4554, https://doi.org/10.1175/JCLI-D-19-0548.1.
 
@@ -65,6 +65,8 @@ Lou, J., T. J. O’Kane, and N. J. Holbrook, 2021: A Linear Inverse Model of Tro
 Newman, M., 2007: Interannual to decadal predictability of tropical and North Pacific sea surface temperatures. J. Climate, 20, 2333–2356, https://doi.org/10.1175/JCLI4165.1.
 
 Penland, C., and T. Magorian, 1993: Prediction of Niño 3 Sea Surface Temperatures Using Linear Inverse Modeling. J. Climate, 6, 1067–1076, https://doi.org/10.1175/1520-0442(1993)006<1067:PONSST>2.0.CO;2.
+
+Penland, C., and P. D. Sardeshmukh, 1995: The optimal growth of tropical sea surface temperature anomalies. J. Climate, 8, 1999–2024, https://doi.org/10.1175/1520-0442(1995)008<1999:TOGOTS>2.0.CO;2.
 
 Shin, S.-I., and M. Newman, 2021: Seasonal Predictability of global and North American coastal sea surface temperature and height anomalies. Geophys. Res. Lett., 48, e2020GL091886, https://doi.org/10.1029/2020GL091886.
 
