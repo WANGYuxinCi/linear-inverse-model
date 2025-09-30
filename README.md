@@ -43,6 +43,18 @@ This toolbox implements both types of LIMs:
 - **STationary LIM (STLIM)**: assumes time-invariant operators, i.e., the dynamical operator 𝐋, the propagation operator 𝐆, and noise covariance 𝐐 are always fixed and constant in time. Implemented in `STLIM.py`.
 - **CycloStationary LIM (CSLIM)**: allows operators to vary periodically over a known cycle, written as 𝐋<sub>j</sub>, 𝐆<sub>j</sub>, and 𝐐<sub>j</sub> for phase j. For example, in climate studies, a CSLIM trained on monthly data can capture seasonally varying dynamics, and is recommended when the phenomena of interest exhibit strong seasonal features. Implemented in `CSLIM.py`.
 
+## Description
+
+The linear inverse model toolbox can be installed by:
+
+#### From GitHub
+```bash
+pip install git+https://github.com/WANGYuxinCi/linear-inverse-model.git
+```
+
+## Quick Start
+
+**Wyrtki_CSLIM_cookbook.ipynb** is a Jupyter notebook that reproduces the "Wyrtki-CSLIM" used for ENSO forecasting in Wang et al. (submitted), using `CSLIM.py`. It also showcases how to initialize, train, and run deterministic forecasts with CSLIM. The STLIM workflow, implemented in `STLIM.py`, is analogous to the CSLIM example.
 
 If you encounter problems in running the linear inverse model or have questions, please feel free to contact Yuxin Wang (yuxinw@hawaii.edu).
 
