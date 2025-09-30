@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Linear Inverse Model (LIM) toolbox"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "CC-BY-4.0" }
+license = { file = "LICENSE" }
 authors = [{ name = "Yuxin Wang" }]
 dependencies = [
   "numpy>=1.23",
