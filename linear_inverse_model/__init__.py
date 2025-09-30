@@ -1,6 +1,6 @@
 """linear_inverse_model (LIM) toolbox."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from .CSLIM import CSLIM
 from .STLIM import STLIM
