@@ -28,3 +28,24 @@ speed = ["numba>=0.58"]
 [project.urls]
 Homepage = "https://github.com/WANGYuxinCi/linear-inverse-model"
 Issues = "https://github.com/WANGYuxinCi/linear-inverse-model/issues"
+
+[tool.hatch.build]
+exclude = [
+  "/.venv",
+  "/.venv-*",
+  "/venv",
+  "/build",
+  "/dist",
+  "/*.egg-info",
+  "/.ipynb_checkpoints",
+  "/.pytest_cache",
+  "/.mypy_cache",
+  "/.vscode",
+  "/.idea",
+  "/#",
+  "/create",
+  "/OUTSIDE",
+  "/repo",
+  "/the",
+  "/lim-release"
+]
