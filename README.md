@@ -45,7 +45,12 @@ This toolbox implements both types of LIMs:
 
 ## Description
 
-The linear inverse model toolbox can be installed by:
+The linear_inverse_model toolbox can be installed in two ways:
+
+#### From PyPI
+```bash
+pip install linear-inverse-model
+```
 
 #### From GitHub
 ```bash
