@@ -43,7 +43,7 @@ This toolbox implements both types of LIMs:
 - **STationary LIM (STLIM)**: assumes time-invariant operators, i.e., the dynamical operator 𝐋, the propagation operator 𝐆, and noise covariance 𝐐 are always fixed and constant in time. Implemented in `STLIM.py`.
 - **CycloStationary LIM (CSLIM)**: allows operators to vary periodically over a known cycle, written as 𝐋<sub>j</sub>, 𝐆<sub>j</sub>, and 𝐐<sub>j</sub> for phase j. For example, in climate studies, a CSLIM trained on monthly data can capture seasonally varying dynamics, and is recommended when the phenomena of interest exhibit strong seasonal features. Implemented in `CSLIM.py`.
 
-## Description
+## Installation
 
 The linear_inverse_model toolbox can be installed in two ways:
 
