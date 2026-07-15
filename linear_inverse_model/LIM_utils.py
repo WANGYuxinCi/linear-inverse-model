@@ -439,83 +439,382 @@ def rebuild_eof_on_grid(eof_row, mask2d):
     return eof2d
 
 
-def compute_linear_detrended_fixed_climatology_anomaly(
+def compute_fixed_climatology_anomaly(
     ds: xr.DataArray,
     time_dim: str = "time",
-    base_start: int | str = 1991,         # year (1991) or date "1991-01-01"
-    base_end: int | str | None = None,    # year (2020) or date "2020-12-31"
-    base_years: int = 30,                 # used when base_end is None
+    base_start: int = 1991,
+    base_end: int = 2020,
 ) -> xr.DataArray:
     """
-    Anomalies = (grid-wise linear-detrended field) - (fixed monthly climatology over base window).
+    Calculate anomalies by removing a fixed monthly climatology.
+
+    This function does not remove a linear or nonlinear trend. It calculates
+    one climatological mean for each calendar month using a fixed reference
+    period and subtracts that monthly climatology from the entire time series.
+
+    Mathematically:
+
+        anomaly(x, t) = data(x, t) - climatology(x, month(t))
+
+    where the climatology is calculated separately for January, February,
+    ..., December over the selected base period.
+
+    For example, when base_start=1991 and base_end=2020:
+
+        January anomaly =
+            January value
+            - mean of all January values from 1991 through 2020
+
+        February anomaly =
+            February value
+            - mean of all February values from 1991 through 2020
+
+    The same fixed 1991-2020 monthly climatology is applied to every year,
+    including years before 1991 and after 2020.
 
     Parameters
     ----------
-    ds : xr.DataArray  (time, lat, lon, ...)
-    time_dim : str
-    base_start : int|str
-        Base period start (year or ISO date). E.g., 1991 or "1991-01-01".
-    base_end : int|str|None
-        Base period end (year or ISO date). If None, it's computed as base_start + base_years - 1 (to Dec 31).
-    base_years : int
-        Window length if base_end is None (default 30).
+    ds : xr.DataArray
+        Input data with a datetime coordinate. The expected dimensions are
+        typically:
+
+            (time, lat, lon)
+
+        but additional spatial dimensions are also supported.
+
+    time_dim : str, default="time"
+        Name of the time dimension. For the ORAS5 data, use:
+
+            time_dim="time_counter"
+
+    base_start : int, default=1991
+        First year of the fixed climatological reference period.
+
+    base_end : int, default=2020
+        Last year of the fixed climatological reference period.
 
     Returns
     -------
-    anomaly : xr.DataArray  (same shape as ds)
+    anomaly : xr.DataArray
+        Anomaly field with the same dimensions and datetime coordinates as
+        the input DataArray.
+
+        No trend is removed. The output is:
+
+            original data - fixed monthly climatology
+
+    Notes
+    -----
+    This function is appropriate when you want the conventional SST anomaly
+    relative to a fixed climatological period, such as 1991-2020.
+
+    If the input is absolute SST, the output is the conventional SST anomaly.
+    If the input has already been detrended, the output will instead be the
+    climatological anomaly of that detrended field.
     """
 
+    # Make sure that the requested time dimension exists.
     if time_dim not in ds.dims:
-        raise ValueError(f"`{time_dim}` not in dims: {ds.dims}")
+        raise ValueError(
+            f"`{time_dim}` is not present in dimensions: {ds.dims}"
+        )
 
-    # ---- Normalize base window ----
-    def _year_from(x):
-        return int(str(x)[:4])
+    # Convert the beginning and ending years into complete date strings.
+    # These strings are used to select the fixed climatology period.
+    start_date = f"{base_start}-01-01"
+    end_date = f"{base_end}-12-31"
 
-    by = _year_from(base_start)
-    if base_end is None:
-        ey = by + base_years - 1
-        base_start_str = f"{by}-01-01"
-        base_end_str   = f"{ey}-12-31"
-    else:
-        ey = _year_from(base_end)
-        # Respect provided full dates if given
-        base_start_str = base_start if isinstance(base_start, str) and "-" in str(base_start) else f"{by}-01-01"
-        base_end_str   = base_end   if isinstance(base_end,   str) and "-" in str(base_end)   else f"{ey}-12-31"
-
-    # ---- 1) Linear detrend (grid-wise) ----
-    t = xr.DataArray(
-        np.arange(ds.sizes[time_dim], dtype="float64"),
-        dims=(time_dim,), coords={time_dim: ds[time_dim]}, name="t_index",
-    )
-    pf = ds.polyfit(dim=time_dim, deg=1, skipna=True)          # returns ...polyfit_coefficients(degree)
-    trend = xr.polyval(t, pf.polyfit_coefficients)             # a*t + b
-    detrended = (ds - trend).assign_attrs(ds.attrs)
-    detrended.name = (ds.name + "_detrended") if ds.name else "detrended"
-
-    # ---- 2) Fixed monthly climatology over [base_start, base_end] ----
-    base = detrended.sel({time_dim: slice(base_start_str, base_end_str)})
-    if base.sizes.get(time_dim, 0) == 0:
-        raise ValueError(f"No data in climatology window [{base_start_str} .. {base_end_str}]")
-
-    clim = base.groupby(f"{time_dim}.month").mean(dim=time_dim, skipna=True)
-
-    # Subtract fixed monthly climatology from all times
-    anomaly = detrended.groupby(f"{time_dim}.month") - clim
-    # Clean up the temporary 'month' coord if it appears
-    if "month" in getattr(anomaly, "coords", {}):
-        anomaly = anomaly.drop_vars("month", errors="ignore")
-
-    # ---- attrs ----
-    anomaly = anomaly.assign_attrs(detrended.attrs)
-    anomaly.attrs.update({
-        "anomaly_base_period": f"{by}–{ey} (fixed monthly climatology)",
-        "detrend": "linear, grid-wise (xarray.polyfit deg=1)",
+    # ---- 1) Select the fixed climatological reference period ----
+    #
+    # For base_start=1991 and base_end=2020, this selects all available
+    # monthly data from January 1991 through December 2020.
+    base = ds.sel({
+        time_dim: slice(start_date, end_date)
     })
+
+    # Stop with a clear error if the requested climatological period is not
+    # present in the input dataset.
+    if base.sizes.get(time_dim, 0) == 0:
+        raise ValueError(
+            f"No data found in climatology period "
+            f"[{start_date} through {end_date}]"
+        )
+
+    # ---- 2) Calculate the fixed monthly climatology ----
+    #
+    # This produces 12 climatological maps:
+    #
+    #     month=1  -> January climatology
+    #     month=2  -> February climatology
+    #     ...
+    #     month=12 -> December climatology
+    #
+    # Missing values are ignored when calculating the climatological means.
+    monthly_climatology = base.groupby(
+        f"{time_dim}.month"
+    ).mean(
+        dim=time_dim,
+        skipna=True,
+    )
+
+    # ---- 3) Remove the monthly climatology from the complete record ----
+    #
+    # Each January is compared with the January climatology, each February
+    # is compared with the February climatology, and so on.
+    anomaly = (
+        ds.groupby(f"{time_dim}.month")
+        - monthly_climatology
+    )
+
+    # The groupby operation may leave an auxiliary "month" coordinate.
+    # It is not needed after calculating the anomalies.
+    if "month" in anomaly.coords:
+        anomaly = anomaly.drop_vars(
+            "month",
+            errors="ignore",
+        )
+
+    # Preserve the original metadata, such as units and variable description.
+    anomaly = anomaly.assign_attrs(ds.attrs)
+
+    # Add information describing how the anomaly was calculated.
+    anomaly.attrs.update({
+        "anomaly_base_period": (
+            f"{base_start}-{base_end} fixed monthly climatology"
+        ),
+        "detrend": "none",
+        "anomaly_method": (
+            "Original data minus fixed monthly climatology"
+        ),
+    })
+
+    # Preserve the original variable name.
     anomaly.name = ds.name
 
     return anomaly
 
 
+def compute_linear_detrended_fixed_climatology_anomaly(
+    ds: xr.DataArray,
+    time_dim: str = "time",
+    base_start: int = 1991,
+    base_end: int = 2020,
+) -> xr.DataArray:
+    """
+    Remove a grid-point linear trend and then remove a fixed monthly
+    climatology from the detrended field.
 
+    The calculation follows two main steps:
+
+        1. Fit and remove a linear trend separately at every grid point.
+        2. Calculate and remove a fixed monthly climatology from the
+           detrended data.
+
+    Mathematically, the fitted linear trend is:
+
+        trend(x, t) = slope(x) * t + intercept(x)
+
+    The detrended field is:
+
+        detrended(x, t) = data(x, t) - trend(x, t)
+
+    The final anomaly is:
+
+        anomaly(x, t) =
+            detrended(x, t)
+            - climatology_of_detrended_data(x, month(t))
+
+    Therefore, the output is:
+
+        original data
+        - grid-point linear trend
+        - fixed monthly climatology of the detrended data
+
+    A separate trend is fitted at every spatial grid point. This allows
+    different locations to have different warming or cooling rates.
+
+    Parameters
+    ----------
+    ds : xr.DataArray
+        Input data with a datetime coordinate. The expected dimensions are
+        typically:
+
+            (time, lat, lon)
+
+        Additional spatial dimensions are also supported.
+
+    time_dim : str, default="time"
+        Name of the time dimension. For the ORAS5 data, use:
+
+            time_dim="time_counter"
+
+    base_start : int, default=1991
+        First year of the fixed climatological reference period.
+
+    base_end : int, default=2020
+        Last year of the fixed climatological reference period.
+
+    Returns
+    -------
+    anomaly : xr.DataArray
+        Linearly detrended fixed-climatology anomaly field with the same
+        dimensions and datetime coordinates as the input.
+
+    Notes
+    -----
+    The trend is fitted and evaluated using the same numerical time index:
+
+        0, 1, 2, ..., N-1
+
+    This is important because the input time coordinate normally contains
+    datetime values. Fitting with datetime values and evaluating with
+    0, 1, 2, ... would use inconsistent time coordinates and would not
+    correctly remove the trend.
+
+    This function removes the complete fitted linear component, including
+    both its slope and intercept. The subsequent monthly-climatology removal
+    eliminates any constant offset, so the intercept does not affect the
+    final anomaly.
+    """
+
+    # Make sure that the requested time dimension exists.
+    if time_dim not in ds.dims:
+        raise ValueError(
+            f"`{time_dim}` is not present in dimensions: {ds.dims}"
+        )
+
+    # Convert the beginning and ending climatology years into complete
+    # date strings.
+    start_date = f"{base_start}-01-01"
+    end_date = f"{base_end}-12-31"
+
+    # ---- 1) Create a consistent numerical time coordinate ----
+    #
+    # The numerical time coordinate is:
+    #
+    #     0, 1, 2, ..., N-1
+    #
+    # For monthly data, an increase of one represents one monthly time step.
+    time_index_values = np.arange(
+        ds.sizes[time_dim],
+        dtype="float64",
+    )
+
+    # Temporarily replace the datetime coordinate with the numerical time
+    # index before fitting the trend.
+    #
+    # The original input DataArray is not modified because assign_coords()
+    # returns a new DataArray.
+    ds_for_fit = ds.assign_coords({
+        time_dim: time_index_values
+    })
+
+    # ---- 2) Fit a grid-point linear trend ----
+    #
+    # xarray.polyfit() fits:
+    #
+    #     value(t) = slope * t + intercept
+    #
+    # independently at every spatial grid point.
+    #
+    # skipna=True allows the fit to ignore missing observations.
+    linear_fit = ds_for_fit.polyfit(
+        dim=time_dim,
+        deg=1,
+        skipna=True,
+    )
+
+    # Build a numerical time DataArray for evaluating the trend.
+    #
+    # Its data values are 0, 1, 2, ..., N-1, matching the values used for
+    # fitting. Its coordinate labels are the original datetime values, so
+    # the calculated trend remains aligned with the original dataset.
+    time_index = xr.DataArray(
+        time_index_values,
+        dims=(time_dim,),
+        coords={time_dim: ds[time_dim]},
+        name="time_index",
+    )
+
+    # ---- 3) Evaluate the fitted trend ----
+    #
+    # Because the trend is evaluated using the same numerical time values
+    # used during fitting, the resulting linear trend is correct.
+    linear_trend = xr.polyval(
+        time_index,
+        linear_fit.polyfit_coefficients,
+    )
+
+    # ---- 4) Remove the grid-point linear trend ----
+    #
+    # Each grid cell has its own fitted slope and intercept.
+    detrended = ds - linear_trend
+
+    # ---- 5) Select the fixed climatological reference period ----
+    #
+    # The climatology must be calculated from the detrended data because
+    # this function follows the order:
+    #
+    #     detrend first -> calculate climatology -> remove climatology
+    base = detrended.sel({
+        time_dim: slice(start_date, end_date)
+    })
+
+    # Stop with a clear error if the requested climatological period is not
+    # present in the input dataset.
+    if base.sizes.get(time_dim, 0) == 0:
+        raise ValueError(
+            f"No data found in climatology period "
+            f"[{start_date} through {end_date}]"
+        )
+
+    # ---- 6) Calculate the fixed monthly climatology ----
+    #
+    # This produces one climatological detrended field for each calendar
+    # month using only the selected base period.
+    monthly_climatology = base.groupby(
+        f"{time_dim}.month"
+    ).mean(
+        dim=time_dim,
+        skipna=True,
+    )
+
+    # ---- 7) Remove the fixed monthly climatology ----
+    #
+    # Each detrended January field is compared with the detrended January
+    # climatology, each February with the February climatology, and so on.
+    anomaly = (
+        detrended.groupby(f"{time_dim}.month")
+        - monthly_climatology
+    )
+
+    # Remove the auxiliary "month" coordinate if groupby created it.
+    if "month" in anomaly.coords:
+        anomaly = anomaly.drop_vars(
+            "month",
+            errors="ignore",
+        )
+
+    # Preserve the original variable attributes.
+    anomaly = anomaly.assign_attrs(ds.attrs)
+
+    # Add metadata describing the detrending and climatology procedures.
+    anomaly.attrs.update({
+        "anomaly_base_period": (
+            f"{base_start}-{base_end} fixed monthly climatology"
+        ),
+        "detrend": (
+            "Linear grid-point trend fitted and evaluated using "
+            "the same numerical time index"
+        ),
+        "anomaly_method": (
+            "Remove grid-point linear trend, then remove fixed "
+            "monthly climatology from detrended data"
+        ),
+    })
+
+    # Preserve the original variable name.
+    anomaly.name = ds.name
+
+    return anomaly
 
